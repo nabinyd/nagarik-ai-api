@@ -13,7 +13,7 @@ class RAGService:
                  qdrant_service: QdrantService,
                  embedding_model: EmbeddingModel,
                  llm_model: LLMModel,
-                 top_k: int = 5):
+                 top_k: int = 2):
         """Initialize RAG service"""
         self.qdrant = qdrant_service
         self.embedding = embedding_model
@@ -53,45 +53,62 @@ class RAGService:
         return prompt
     
     def generate_answer(self, query: str) -> Dict[str, Any]:
-        """
-        Generate answer using RAG pipeline
-        
-        Args:
-            query: User query
-            
-        Returns:
-            Dictionary with answer and sources
-        """
         try:
             # Step 1: Retrieve relevant documents
             sources = self.retrieve(query)
-            
+
             if not sources:
                 return {
                     "answer": "क्षमा गर्नुहोस्, यस प्रश्नको लागि कुनै सान्दर्भिक जानकारी भेटिएन।",
                     "sources": []
                 }
-            
-            # Step 2: Build context from retrieved documents
-            context = "\n\n---\n\n".join([s["content"] for s in sources])
-            
+
+            # Step 2: Build limited context
+            MAX_CHUNK_CHARS = 1500
+            MAX_CONTEXT_CHARS = 6000
+
+            context_parts = []
+            current_size = 0
+
+            for source in sources:
+                content = source["content"][:MAX_CHUNK_CHARS]
+
+                if current_size + len(content) > MAX_CONTEXT_CHARS:
+                    break
+
+                context_parts.append(content)
+                current_size += len(content)
+
+            context = "\n\n---\n\n".join(context_parts)
+
+            logger.info(
+                f"Using {len(context_parts)} documents, "
+                f"context size={len(context)} chars"
+            )
+
             # Step 3: Generate prompt
             prompt = self.generate_prompt(query, context)
-            
+
+            logger.info(f"Prompt size={len(prompt)} chars")
+
             # Step 4: Generate answer using LLM
             system_prompt = "तपाईं एक सहायक नेपाली कानुनी विशेषज्ञ हुनुहुन्छ।"
-            answer = self.llm.generate(prompt, system_prompt)
-            
+
+            answer = self.llm.generate(
+                prompt,
+                system_prompt
+            )
+
             # Step 5: Return result
             return {
                 "answer": answer,
                 "sources": sources
             }
-            
+
         except Exception as e:
             logger.error(f"RAG generation failed: {e}")
             raise
-    
+        
     def health_check(self) -> Dict[str, bool]:
         """Check health of all components"""
         return {
