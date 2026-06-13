@@ -1,0 +1,53 @@
+name: 🚀 Deploy FastAPI Staging
+
+on:
+  push:
+    branches: [stage]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    name: Deploy FastAPI to Staging VM
+
+    steps:
+      - name: 🧩 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          ssh -T git@github.com || true
+
+      - name: 🧾 Make script executable
+        run: chmod +x scripts/deploy-stage.sh
+
+      - name: 🚀 Run FastAPI staging deployment
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          GROQ_TEMPERATURE: ${{ secrets.GROQ_TEMPERATURE }}
+
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          COLLECTION_NAME: ${{ secrets.COLLECTION_NAME }}
+
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_TEMPERATURE: ${{ secrets.GEMINI_TEMPERATURE }}
+
+          EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+
+          DEBUG: ${{ secrets.DEBUG }}
+
+          TOP_K_RESULTS: ${{ secrets.TOP_K_RESULTS }}
+
+          RATE_LIMIT: ${{ secrets.RATE_LIMIT }}
+          RATE_LIMIT_PERIOD: ${{ secrets.RATE_LIMIT_PERIOD }}
+
+          PORT: 5000
+          HOST: 0.0.0.0
+
+        run: ./scripts/deploy-stage.sh
