@@ -99,7 +99,8 @@ def get_llm_model(config) -> LLMModel:
 
     if _llm_model is None:
 
-        provider = getattr(config, "LLM_PROVIDER", "gemini")
+        provider = getattr(config, "LLM_PROVIDER", "groq")
+        # provider = getattr(config, "LLM_PROVIDER", "gemini")
 
         if provider == "groq":
 

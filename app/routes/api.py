@@ -95,6 +95,7 @@ def ask():
         return jsonify({"error": error_message}), 400
     
     query = data["query"].strip()
+    logger.info(f"Processing query from {client_ip}: {query[:100]}...")
     
     try:
         # Get RAG service from app config
@@ -121,7 +122,7 @@ def ask():
             "message": str(e) if current_app.config["config"].DEBUG else "Please try again later"
         }), 500
 
-@api_bp.route("/ask", methods=["OPTIONS"])
-def ask_options():
-    """Handle CORS preflight"""
-    return jsonify({}), 200
+# @api_bp.route("/ask", methods=["OPTIONS"])
+# def ask_options():
+#     """Handle CORS preflight"""
+#     return jsonify({}), 200
