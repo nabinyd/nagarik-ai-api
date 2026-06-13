@@ -26,10 +26,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Multi-Arch Image
+      - name: Build & Push (ARM64 only)
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ghcr.io/nabinyd/nagarik-ai-api:staging
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
