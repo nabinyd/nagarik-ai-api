@@ -1,7 +1,12 @@
+
 name: Deploy Staging
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - stage
 
@@ -13,13 +18,15 @@ jobs:
   deploy:
     name: Deploy Nagarikai Staging
 
+    if: github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to staging VM
         uses: appleboy/ssh-action@v1.2.5
         env:
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
           GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
 
@@ -39,28 +46,39 @@ jobs:
               --username "$GHCR_USERNAME" \
               --password-stdin
 
-            export NAGRIK_AI_IMAGE="ghcr.io/${{ github.repository_owner }}/nagrik-ai:${IMAGE_TAG}"
+            export NAGRIK_AI_IMAGE="ghcr.io/YOUR_GITHUB_USERNAME/nagrik-ai:${IMAGE_TAG}"
 
-            docker compose -f docker-compose.stage.yml pull nagrik-ai-staging
+            echo "Deploying image: $NAGRIK_AI_IMAGE"
+
+            docker pull "$NAGRIK_AI_IMAGE"
 
             docker compose -f docker-compose.stage.yml up -d \
               --no-build \
               --force-recreate \
               nagrik-ai-staging
 
-            sleep 10
+            echo "Waiting for FastAPI health check..."
 
-            docker compose -f docker-compose.stage.yml ps
+            for i in $(seq 1 60); do
+              STATUS=$(docker inspect nagrik-ai-staging \
+                --format='{{.State.Health.Status}}' 2>/dev/null || echo "missing")
 
-            STATUS=$(docker inspect nagrik-ai-staging \
-              --format='{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+              if [ "$STATUS" = "healthy" ]; then
+                docker compose -f docker-compose.stage.yml ps
+                docker image prune -f
+                echo "Nagarikai staging deployment successful."
+                exit 0
+              fi
 
-            if [ "$STATUS" != "healthy" ]; then
-              echo "Staging health check failed: $STATUS"
-              docker logs --tail 100 nagrik-ai-staging
-              exit 1
-            fi
+              if [ "$STATUS" = "unhealthy" ] || [ "$STATUS" = "missing" ]; then
+                echo "Staging health check failed: $STATUS"
+                docker logs --tail 100 nagrik-ai-staging
+                exit 1
+              fi
 
-            docker image prune -f
+              sleep 6
+            done
 
-            echo "Nagarikai staging deployment successful."
+            echo "Staging health check timed out."
+            docker logs --tail 100 nagrik-ai-staging
+            exit 1
