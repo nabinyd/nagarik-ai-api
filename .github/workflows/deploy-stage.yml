@@ -1,0 +1,79 @@
+name: Deploy Staging
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - stage
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy Nagarikai Staging
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to staging VM
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          envs: IMAGE_TAG,IMAGE_OWNER,GHCR_USERNAME,GHCR_TOKEN
+
+          script: |
+            set -eu
+
+            cd /opt/nagarik-ai/backend/staging
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io \
+              --username "$GHCR_USERNAME" \
+              --password-stdin
+
+            IMAGE_OWNER=$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')
+            export NAGRIK_AI_IMAGE="ghcr.io/${IMAGE_OWNER}/nagrik-ai:${IMAGE_TAG}"
+
+            echo "Deploying $NAGRIK_AI_IMAGE"
+
+            docker pull "$NAGRIK_AI_IMAGE"
+
+            docker compose -f docker-compose.stage.yml up -d \
+              --no-build \
+              --force-recreate \
+              nagrik-ai-staging
+
+            for i in $(seq 1 60); do
+              STATUS=$(docker inspect nagrik-ai-staging \
+                --format='{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+
+              if [ "$STATUS" = "healthy" ]; then
+                docker compose -f docker-compose.stage.yml ps
+                docker image prune -f
+                echo "Staging deployment successful."
+                exit 0
+              fi
+
+              if [ "$STATUS" = "unhealthy" ] || [ "$STATUS" = "missing" ]; then
+                docker logs --tail 100 nagrik-ai-staging
+                exit 1
+              fi
+
+              sleep 6
+            done
+
+            echo "Health check timed out."
+            docker logs --tail 100 nagrik-ai-staging
+            exit 1

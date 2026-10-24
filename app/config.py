@@ -35,5 +35,10 @@ class Config:
     # Rate Limiting
     RATE_LIMIT: int = int(os.getenv("RATE_LIMIT", "100"))
     RATE_LIMIT_PERIOD: int = int(os.getenv("RATE_LIMIT_PERIOD", "60"))
+    
+    # GROQ Configuration
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "gpt-4o-mini")
+    GROQ_TEMPERATURE: float = float(os.getenv("GROQ_TEMPERATURE", "0.2"))
 
 config = Config()

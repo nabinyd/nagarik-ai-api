@@ -18,7 +18,7 @@ class QdrantService:
             logger.error(f"Failed to connect to Qdrant: {e}")
             raise
     
-    def search(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query_vector: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
         """
         Search for similar vectors in Qdrant
         """
