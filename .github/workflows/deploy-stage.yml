@@ -33,7 +33,7 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           envs: IMAGE_TAG,IMAGE_OWNER,GHCR_USERNAME,GHCR_TOKEN
-          command_timeout: 15m
+          command_timeout: 30m
           timeout: 60s
 
           script: |
