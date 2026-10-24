@@ -1,19 +1,41 @@
-.PHONY: build up down stop restart logs
 
+.PHONY: build up down stop restart logs status test docs
+
+COMPOSE = docker compose -f docker-compose.staging.yml
+SERVICE = nagrik-ai-staging
+
+# Build and start staging in the background
 build:
-	docker compose -f docker-compose.staging.yml up -d --build
+	$(COMPOSE) up -d --build
 
+# Start staging in the background
 up:
-	docker compose -f docker-compose.staging.yml up
+	$(COMPOSE) up
 
+# Stop and remove containers and networks
 down:
-	docker compose -f docker-compose.staging.yml down
+	$(COMPOSE) down
 
+# Stop containers without removing them
 stop:
-	docker compose -f docker-compose.staging.yml stop
+	$(COMPOSE) stop
 
+# Restart existing containers
 restart:
-	docker compose -f docker-compose.staging.yml restart
+	$(COMPOSE) restart
 
+# Follow logs
 logs:
-	docker compose -f docker-compose.staging.yml logs -f
+	$(COMPOSE) logs -f $(SERVICE)
+
+# Show container status
+status:
+	$(COMPOSE) ps
+
+# Test the health endpoint
+test:
+	curl -f http://localhost:5001/health
+
+# Open Swagger UI in your browser (Linux)
+docs:
+	xdg-open http://localhost:5001/docs

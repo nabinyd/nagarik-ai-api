@@ -1,53 +1,66 @@
-name: 🚀 Deploy FastAPI Staging
+name: Deploy Staging
 
 on:
   push:
-    branches: [stage]
+    branches:
+      - stage
+
+permissions:
+  contents: read
+  packages: read
 
 jobs:
   deploy:
-    runs-on: self-hosted
-    name: Deploy FastAPI to Staging VM
+    name: Deploy Nagarikai Staging
+
+    runs-on: ubuntu-latest
 
     steps:
-      - name: 🧩 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🛠️ Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.STAGE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          ssh -T git@github.com || true
-
-      - name: 🧾 Make script executable
-        run: chmod +x scripts/deploy-stage.sh
-
-      - name: 🚀 Run FastAPI staging deployment
+      - name: Deploy to staging VM
+        uses: appleboy/ssh-action@v1.2.5
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
-          GROQ_TEMPERATURE: ${{ secrets.GROQ_TEMPERATURE }}
+          IMAGE_TAG: ${{ github.sha }}
+          GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
 
-          QDRANT_URL: ${{ secrets.QDRANT_URL }}
-          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
-          COLLECTION_NAME: ${{ secrets.COLLECTION_NAME }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
 
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-          GEMINI_TEMPERATURE: ${{ secrets.GEMINI_TEMPERATURE }}
+          envs: IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN
 
-          EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+          script: |
+            set -eu
 
-          DEBUG: ${{ secrets.DEBUG }}
+            cd /opt/nagarik-ai/backend/staging
 
-          TOP_K_RESULTS: ${{ secrets.TOP_K_RESULTS }}
+            echo "$GHCR_TOKEN" | docker login ghcr.io \
+              --username "$GHCR_USERNAME" \
+              --password-stdin
 
-          RATE_LIMIT: ${{ secrets.RATE_LIMIT }}
-          RATE_LIMIT_PERIOD: ${{ secrets.RATE_LIMIT_PERIOD }}
+            export NAGRIK_AI_IMAGE="ghcr.io/${{ github.repository_owner }}/nagrik-ai:${IMAGE_TAG}"
 
-          PORT: 5000
-          HOST: 0.0.0.0
+            docker compose -f docker-compose.stage.yml pull nagrik-ai-staging
 
-        run: ./scripts/deploy-stage.sh
+            docker compose -f docker-compose.stage.yml up -d \
+              --no-build \
+              --force-recreate \
+              nagrik-ai-staging
+
+            sleep 10
+
+            docker compose -f docker-compose.stage.yml ps
+
+            STATUS=$(docker inspect nagrik-ai-staging \
+              --format='{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+
+            if [ "$STATUS" != "healthy" ]; then
+              echo "Staging health check failed: $STATUS"
+              docker logs --tail 100 nagrik-ai-staging
+              exit 1
+            fi
+
+            docker image prune -f
+
+            echo "Nagarikai staging deployment successful."
