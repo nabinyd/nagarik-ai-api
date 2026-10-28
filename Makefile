@@ -1,14 +1,15 @@
-
 .PHONY: build up down stop restart logs status test docs
 
-COMPOSE = docker compose -f docker-compose.staging.yml
-SERVICE = nagrik-ai-staging
+COMPOSE = docker compose
+SERVICE = nagrik-ai-local
+PORT = 5000
+BASE_URL = http://localhost:$(PORT)
 
-# Build and start staging in the background
+# Build the local image and start in the background
 build:
 	$(COMPOSE) up -d --build
 
-# Start staging in the background
+# Start the application in the foreground
 up:
 	$(COMPOSE) up
 
@@ -24,7 +25,7 @@ stop:
 restart:
 	$(COMPOSE) restart
 
-# Follow logs
+# Follow application logs
 logs:
 	$(COMPOSE) logs -f $(SERVICE)
 
@@ -34,8 +35,8 @@ status:
 
 # Test the health endpoint
 test:
-	curl -f http://localhost:5001/health
+	curl -f $(BASE_URL)/health
 
-# Open Swagger UI in your browser (Linux)
+# Open Swagger UI in the browser (Linux)
 docs:
-	xdg-open http://localhost:5001/docs
+	xdg-open $(BASE_URL)/docs

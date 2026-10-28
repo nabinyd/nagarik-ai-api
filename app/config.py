@@ -10,7 +10,6 @@ class Config:
     # Qdrant Configuration
     QDRANT_URL: str = os.getenv("QDRANT_URL", "")
     QDRANT_API_KEY: str = os.getenv("QDRANT_API_KEY", "")
-    COLLECTION_NAME: str = os.getenv("COLLECTION_NAME", "nagrik_ai")
     
     # OpenAI Configuration
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
