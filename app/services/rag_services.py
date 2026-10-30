@@ -1,10 +1,6 @@
 from typing import Dict, Any, List
 import logging
 
-from app.services.quadrant_services import QdrantService
-from app.models.embedding import EmbeddingModel
-from app.models.llm import LLMModel
-
 logger = logging.getLogger(__name__)
 
 
@@ -13,25 +9,40 @@ class RAGService:
 
     def __init__(
         self,
-        qdrant_service: QdrantService,
-        embedding_model: EmbeddingModel,
-        llm_model: LLMModel,
+        config,
+        qdrant_service=None,
+        embedding_model=None,
+        llm_model=None,
         top_k: int = 2,
     ):
         """Initialize RAG service."""
         self.qdrant = qdrant_service
+        self.config = config
         self.embedding = embedding_model
         self.llm = llm_model
         self.top_k = top_k
 
         logger.info("RAG Service initialized")
 
+    def get_qdrant(self):
+        if self.qdrant is None:
+            from app.services.quadrant_services import get_qdrant_service
+
+            self.qdrant = get_qdrant_service(self.config)
+
+        return self.qdrant
+
     def retrieve(self, query: str) -> List[Dict[str, Any]]:
         """Retrieve relevant documents from both English and Nepali collections."""
+        if self.embedding is None:
+            from app.models.embedding import get_embedding_model
+
+            self.embedding = get_embedding_model(self.config)
+
         query_vector = self.embedding.encode_query(query)
 
         # QdrantService searches both configured collections.
-        results = self.qdrant.search(
+        results = self.get_qdrant().search(
             query_vector=query_vector,
             top_k=self.top_k,
         )
@@ -130,6 +141,11 @@ class RAGService:
                 "उत्तर दिनुहोस् र कानुनी तथ्य नबनाउनुहोस्।"
             )
 
+            if self.llm is None:
+                from app.models.llm import get_llm_model
+
+                self.llm = get_llm_model(self.config)
+
             answer = self.llm.generate(prompt, system_prompt)
 
             # Step 5: Return answer and source documents.
@@ -145,7 +161,7 @@ class RAGService:
     def health_check(self) -> Dict[str, bool]:
         """Check the health of all components."""
         return {
-            "qdrant": self.qdrant.health_check(),
+            "qdrant": self.get_qdrant().health_check(),
             "embedding": True,
             "llm": True,
         }
@@ -157,15 +173,16 @@ _rag_service = None
 
 def get_rag_service(
     config,
-    qdrant_service,
-    embedding_model,
-    llm_model,
+    qdrant_service=None,
+    embedding_model=None,
+    llm_model=None,
 ) -> RAGService:
     """Get or create the RAG service instance."""
     global _rag_service
 
     if _rag_service is None:
         _rag_service = RAGService(
+            config=config,
             qdrant_service=qdrant_service,
             embedding_model=embedding_model,
             llm_model=llm_model,
