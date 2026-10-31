@@ -5,6 +5,8 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.exceptions import register_exception_handlers
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -22,6 +24,7 @@ def create_app(config) -> FastAPI:
         description="Nagarikai RAG chatbot API",
         version="1.0.0",
     )
+    register_exception_handlers(app)
 
     # Enable CORS
     app.add_middleware(
@@ -41,30 +44,19 @@ def create_app(config) -> FastAPI:
 
     logger.info("Initializing services...")
 
-    from app.services.quadrant_services import get_qdrant_service
-    from app.models.embedding import get_embedding_model
-    from app.models.llm import get_llm_model
     from app.services.rag_services import get_rag_service
 
-    qdrant_service = get_qdrant_service(config)
-    embedding_model = get_embedding_model(config)
-    llm_model = get_llm_model(config)
-
-    rag_service = get_rag_service(
-        config,
-        qdrant_service,
-        embedding_model,
-        llm_model,
-    )
+    rag_service = get_rag_service(config)
 
     # Store services for access in routes
     app.state.rag_service = rag_service
-    app.state.qdrant_service = qdrant_service
 
     # Register FastAPI routes
-    from app.routes.api import router
-    app.include_router(router)
+    from app.api.v1.router import api_router
+
+    app.include_router(api_router, prefix="/api/v1")
 
     logger.info("Application initialized successfully")
 
     return app
+
