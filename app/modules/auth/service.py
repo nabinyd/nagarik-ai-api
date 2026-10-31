@@ -157,3 +157,33 @@ def create_login_response(user: User, secret: str) -> dict:
         "access_token_expires_in": ACCESS_TOKEN_EXPIRES_IN,
         "refresh_token_expires_in": REFRESH_TOKEN_EXPIRES_IN,
     }
+
+
+def refresh_login(
+    db: Session,
+    refresh_token: str,
+    secret: str,
+) -> dict:
+    try:
+        payload = jwt.decode(
+            refresh_token,
+            secret,
+            algorithms=["HS256"],
+        )
+        if payload.get("type") != "refresh":
+            raise ValueError("Not a refresh token")
+        user_id = int(payload["sub"])
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError) as error:
+        raise AppError(
+            "Invalid or expired refresh token",
+            status_code=401,
+        ) from error
+
+    user = db.get(User, user_id)
+    if user is None:
+        raise AppError(
+            "User not found",
+            status_code=401,
+        )
+
+    return create_login_response(user, secret)
