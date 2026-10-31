@@ -54,16 +54,12 @@ def create_app(config) -> FastAPI:
 
     # Enable CORS
     app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "*",  # Allow all origins for development; restrict in production.
-        "http://localhost:3000",
-        # Add your actual staging frontend origin here.
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-)
+        CORSMiddleware,
+        allow_origins=config.cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
 
     # Store configuration
     app.state.config = config
