@@ -2,8 +2,9 @@
 import logging
 import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.exceptions import register_exception_handlers
 
@@ -25,6 +26,31 @@ def create_app(config) -> FastAPI:
         version="1.0.0",
     )
     register_exception_handlers(app)
+
+    @app.get("/health", tags=["Health"])
+    def health_check() -> JSONResponse:
+        try:
+            qdrant_connected = app.state.rag_service.get_qdrant().health_check()
+        except Exception:
+            logger.exception("Qdrant health check failed")
+            qdrant_connected = False
+
+        if not qdrant_connected:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "status": "degraded",
+                    "qdrant": "unavailable",
+                },
+            )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "status": "ok",
+                "qdrant": "connected",
+            },
+        )
 
     # Enable CORS
     app.add_middleware(
